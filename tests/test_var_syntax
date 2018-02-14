@@ -1,0 +1,14 @@
+GF@_3
+
+TF@_x
+
+GF@X
+
+LF@1
+
+https://regex101.com/
+
+regex:
+
+^(GF|LF|TF)\x40([[:alpha:]]|\x5F|\x2D|\x24|\x25|\x26|\x2A)([[:alnum:]]|\x5F|\x2D|\x24|\x25|\x26|\x2A)*$
+
