@@ -1,17 +1,15 @@
 <?php  
 
-echo("Hell!\n");
-
 //####################################################
-//				ZPRACOVANI PARAMETRU 
+//			 	PARAMS 
 $longopts  = array(
     "help",     // help
-    "stats:",    // potrebuje soubor vystupni
-    "comments",        // bez hodnoty
-    "loc",           // bez hodnoty
+    "stats:",    // must have one parameter
+    "comments",        // without parameter
+    "loc",           // without parameter
 );
-$index_comm = -1; // -1 neni zadan
-$index_loc = -1; // -1 neni zadan
+$index_comm = -1; // -1 not set
+$index_loc = -1; // -1 not set
 
 $args = getopt("", $longopts);
 
@@ -25,11 +23,19 @@ else if (count($args) == 1)
 	{
 	if(array_key_exists("help", $args))
 		{
-		echo("TODO napsat --help\n");
+		echo("--help\n");
+		echo("Skript typu filtr (parse.php v jazyce PHP 5.6) načte ze standardního vstupu zdrojový kód v IPPcode18, zkontroluje lexikální a syntaktickou správnost kódu a vypíše na standardní
+výstup XML reprezentaci programu dle specifikace\n");
+		echo("parametry : --help  => vypíše tuto nápovědu\n");
+		echo("            --stats=\"file\" => pozaduje vstupni soubor, do kterého se budou zapisovat sledované paramtery.\n");
+		echo("            --comments => Zapne parametr počet komentarů. Nutné s --stats=\"file\"\n");
+		echo("            --loc => Zapne parametr počet instrukcí. Nutné s --stats=\"file\"\n");
+		exit(0);
 		}
 	else if(array_key_exists("stats", $args))
 		{
-		echo("TODO napsat --stats=file\n");
+			if(($out = fopen($args["stats"], "w")) == false)
+			{exit(10);}
 		}	
 	else{
 		exit(10);
@@ -42,8 +48,10 @@ else if(array_key_exists("help", $args))
 else{
 	if(array_key_exists("stats", $args))
 	{
-		echo("TODO napsat --stats=file\n");	
-
+		if(($out = fopen($args["stats"], "w")) == false)
+		{	
+			exit(10);
+		}
 		if(array_key_exists("loc", $args))
 		{
 			$index_loc = array_search("loc", array_keys($args));
@@ -58,11 +66,6 @@ else{
 	}	
 	}
 }
-	
-var_dump($args);
-echo($index_comm);
-echo($index_loc);
-echo("\n");
 
 //##########################################################
 //			REGEX PART
@@ -75,21 +78,25 @@ echo("\n");
 //	\x25 - %
 //	\x26 - &
 //	\x2A - *
+//  \x2B - +
 //  \x5C - \
 
 $regex_var = '/^(GF|LF|TF)\x40([[:alpha:]]|\x5F|\x2D|\x24|\x25|\x26|\x2A)([[:alnum:]]|\x5F|\x2D|\x24|\x25|\x26|\x2A)*$/';
 $regex_label = '/^([[:alpha:]]|\x5F|\x2D|\x24|\x25|\x26|\x2A)([[:alnum:]]|\x5F|\x2D|\x24|\x25|\x26|\x2A)*$/';
-$regex_int_lit = '/^int\x40\x2D?\d+$/';
+$regex_int_lit = '/^int\x40(\x2D|\x2B)?\d+$/';
 $regex_bool_lit = '/^bool\x40(true|false)$/';
 $regex_string_lit = '/^string\x40((\x5C\d{3})|[^\x23\s\x5C])*$/';
 $regex_type = '/^(int|bool|string)$/';
 $regex_comments = '/\x23.*$/';
 $regex_remove_blank = '/\s*$/';
+$regex_remove_first_blank = '/^\s*/';
 //##########################################################
 
 
 $count_comments = 0;
 $count_instruction = 0;
+
+$type = array("var","int","bool","string");
 
 // matching the first row of txt. must by .IPPCode18 => case incasitive
 $line = trim(fgets(STDIN));
@@ -100,6 +107,8 @@ if(strcmp($line, ".IPPCODE18") != 0)
 {
 	exit(21);
 }
+echo("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+echo("<program language=\"IPPcode18\">\n");
 
 //##########################################################
 //		dictionary with all instruction
@@ -110,6 +119,47 @@ $instr_set = array("MOVE","CREATEFRAME","PUSHFRAME","POPFRAME","DEFVAR","CALL",
 	);
 
 //##########################################################
+//				FUNCTION 
+
+function xml_special_key($string)
+{
+	$string = preg_replace('/&/', "&amp;", $string);
+	$string = preg_replace('/</', "&lt;", $string);
+	$string = preg_replace('/>/', "&gt;", $string);
+	$string = preg_replace('/\'/', "&apos;", $string);
+	$string = preg_replace('/"/', "&quot;", $string);
+
+	return $string;
+}
+
+function get_symb_check($value)
+{
+	global $regex_var, $regex_string_lit, $regex_int_lit, $regex_bool_lit;
+
+	if(preg_match($regex_var, $value))
+		{
+			return array("var" => $value);
+		}
+	else if(preg_match($regex_string_lit, $value))
+		{
+			return array("string" => substr(xml_special_key($value),7));
+		}	
+	else if(preg_match($regex_int_lit, $value))
+		{
+			return array("int" => substr($value,4));
+		}	
+	else if(preg_match($regex_bool_lit, $value))
+		{
+			return array("bool" => substr($value,5));
+		}	
+	else{	
+		exit(21);
+	}	
+ 
+}
+
+//##########################################################
+
 do{
 $line = fgets(STDIN);
 // remove coments
@@ -118,6 +168,7 @@ $count_comments += $count;
 
 // remove end white character
 $line_v = preg_replace($regex_remove_blank, "", $line_v);
+$line_v = preg_replace($regex_remove_first_blank, "", $line_v);
 
 if(trim($line_v) != "")
 {
@@ -132,6 +183,7 @@ if(trim($line_v) != "")
 	;
 
 	//var_dump($words);
+	//var_dump($line);
 	switch($instr)
 	{
 		case 0: // MOVE <VAR> <SYMB>
@@ -141,14 +193,16 @@ if(trim($line_v) != "")
 			if(count($words) != 3) // right num of args
 				{exit(21);}
 			else if(!preg_match($regex_var, $words[1])) // match <VAR>
-				{exit(21);} //match <SYMB>
-			else if(!(preg_match($regex_var, $words[2])||preg_match($regex_string_lit, $words[2])||preg_match($regex_int_lit, $words[2])||preg_match($regex_bool_lit, $words[2])))
-				{exit(21);}
+				{exit(21);} 
 			else{ 
-				echo("TODO XML\n");
+				$sym1 = get_symb_check($words[2]); //match <SYMB>
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg1 type=\"var\">$words[1]</arg1>\n");
+				echo("  <arg2 type=\"".array_search(reset($sym1), $sym1)."\">".reset($sym1)."</arg2>\n");
+				echo(" </instruction>\n");
 			}
 			break;
-		case 1: //CREATEFRAME
+		case 1: // CREATEFRAME
 		case 2:	// PUSHFRAME
 		case 3: // POPFRAME
 		case 6: // RETURN
@@ -156,7 +210,7 @@ if(trim($line_v) != "")
 			if(count($words) != 1)
 				{exit(21);}
 			else{
-				echo("TODO XML\n");
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\"/>\n");
 			}
 			break;
 		case 4: // DEFVAR <VAR>
@@ -166,7 +220,9 @@ if(trim($line_v) != "")
 			else if(!preg_match($regex_var, $words[1])) // match <VAR>
 				{exit(21);} 
 			else{
-				echo("TODO XML\n");
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg1 type=\"var\">$words[1]</arg1>\n");
+				echo(" </instruction>\n");
 			}				
 			break;
 		case 5: // CALL <LABEL>
@@ -177,7 +233,9 @@ if(trim($line_v) != "")
 			else if(!preg_match($regex_label, $words[1])) // match <VAR>
 				{exit(21);} 
 			else{
-				echo("TODO XML\n");
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg1 type=\"label\">$words[1]</arg1>\n");
+				echo(" </instruction>\n");
 			}			
 			break;
 		case 7: // PUSHS <SYMB>
@@ -185,10 +243,11 @@ if(trim($line_v) != "")
 		case 32: // DPRINT <SYMB>
 			if(count($words) != 2)
 				{exit(21);}
-			else if(!(preg_match($regex_var, $words[1])||preg_match($regex_string_lit, $words[1])||preg_match($regex_int_lit, $words[1])||preg_match($regex_bool_lit, $words[1])))
-				{exit(21);} // match <SYMB>
 			else{
-				echo("TODO XML\n");
+				$sym1 = get_symb_check($words[1]); //match <SYMB>
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg2 type=\"".array_search(reset($sym1), $sym1)."\">".reset($sym1)."</arg2>\n");
+				echo(" </instruction>\n");
 			}		
 			break;
 		case 9: // ADD <VAR> <SYMB> <SYMB> 
@@ -208,13 +267,15 @@ if(trim($line_v) != "")
 			if(count($words) != 4) // right num of args
 				{exit(21);}
 			else if(!preg_match($regex_var, $words[1])) // match <VAR>
-				{exit(21);} //match <SYMB>
-			else if(!(preg_match($regex_var, $words[2])||preg_match($regex_string_lit, $words[2])||preg_match($regex_int_lit, $words[2])||preg_match($regex_bool_lit, $words[2])))
-				{exit(21);}
-			else if(!(preg_match($regex_var, $words[3])||preg_match($regex_string_lit, $words[3])||preg_match($regex_int_lit, $words[3])||preg_match($regex_bool_lit, $words[3])))
-				{exit(21);}			
+				{exit(21);} //match <SYMB>		
 			else{ 
-				echo("TODO XML\n");
+				$sym1 = get_symb_check($words[2]); //match <SYMB>
+				$sym2 = get_symb_check($words[3]); //match <SYMB>
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg1 type=\"var\">$words[1]</arg1>\n");
+				echo("  <arg2 type=\"".array_search(reset($sym1), $sym1)."\">".reset($sym1)."</arg2>\n");
+				echo("  <arg3 type=\"".array_search(reset($sym2), $sym2)."\">".reset($sym2)."</arg3>\n");
+				echo(" </instruction>\n");
 			}			
 			break;
 		case 21: //READ <VAR> <TYPE>
@@ -225,7 +286,10 @@ if(trim($line_v) != "")
 			else if(!preg_match($regex_type, $words[2]))
 				{exit(21);}
 			else{ 
-				echo("TODO XML\n");
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg1 type=\"var\">$words[1]</arg1>\n");
+				echo("  <arg2 type=\"type\">$words[2]</arg2>\n");
+				echo(" </instruction>\n");
 			}			
 			break;
 		case 30: // JUMPIFEQ <LABEL> <SYMB> <SYMB>
@@ -233,13 +297,15 @@ if(trim($line_v) != "")
 			if(count($words) != 4) // right num of args
 				{exit(21);}
 			else if(!preg_match($regex_label, $words[1])) // match <VAR>
-				{exit(21);} //match <SYMB>
-			else if(!(preg_match($regex_var, $words[2])||preg_match($regex_string_lit, $words[2])||preg_match($regex_int_lit, $words[2])||preg_match($regex_bool_lit, $words[2])))
-				{exit(21);}
-			else if(!(preg_match($regex_var, $words[3])||preg_match($regex_string_lit, $words[3])||preg_match($regex_int_lit, $words[3])||preg_match($regex_bool_lit, $words[3])))
-				{exit(21);}			
+				{exit(21);} //match <SYMB>		
 			else{ 
-				echo("TODO XML\n");
+				$sym1 = get_symb_check($words[2]); //match <SYMB>
+				$sym2 = get_symb_check($words[3]); //match <SYMB>
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg1 type=\"label\">$words[1]</arg1>\n");
+				echo("  <arg2 type=\"".array_search(reset($sym1), $sym1)."\">".reset($sym1)."</arg2>\n");
+				echo("  <arg3 type=\"".array_search(reset($sym2), $sym2)."\">".reset($sym2)."</arg3>\n");
+				echo(" </instruction>\n");
 			}					
 			break;
 															
@@ -248,14 +314,33 @@ if(trim($line_v) != "")
 	}
 }
 
-
-//var_dump($line);
 }while($line);
 
 //var_dump($count_comments);
 //var_dump($count_instruction);
-//var_dump($line);
-//var_dump($instr_set);
-echo("YEAH!\n");
+if(array_key_exists("stats", $args))
+{
+	if(($count_comments != -1)&&($count_instruction != -1))
+	{
+		if($count_instruction > $count_comments)
+		{
+			fwrite($out, "$count_instruction\n$count_comments\n");
+		}
+		else{
+			fwrite($out, "$count_comments\n$count_instruction\n");
+		}
+	}
+	else if($count_comments != -1)
+	{
+		fwrite($out, "$count_comments\n");
+	}
+	else if($count_instruction != -1)
+	{
+		fwrite($out, "$count_instruction\n");	
+	}
 
+	fclose($out);
+}
+echo("</program>\n");
+exit(0);
 ?>

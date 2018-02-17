@@ -1,15 +1,21 @@
 <?php  
 
-echo("Hell!\n");
+$longopts  = array(
+    "help",     // help
+    "stats:",    // must have one parameter
+    "comments",        // without parameter
+    "loc",           // without parameter
+);
+$index_comm = -1; // -1 not set
+$index_loc = -1; // -1 not set
 
-$regex_string_lit = '/^string\x40((\x5C\d{3})|[^\x23\s\x5C])*$/';
+$args = getopt("", $longopts);
 
-$word = 'string@_#m'; 
-if(!preg_match($regex_string_lit, $word)) // match <VAR>
-	{
-		echo("DONT MATCH\n");
-	}
-else{
-	echo("YEAH!\n");
-	}
+$out = fopen($args["stats"], "w");
+
+fwrite($out, "HELL\n");
+
+
+fclose($out);
+
 ?>
