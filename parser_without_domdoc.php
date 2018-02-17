@@ -94,7 +94,7 @@ $regex_remove_first_blank = '/^\s*/';
 
 
 $count_comments = 0;
-$count_inst = 0;
+$count_instruction = 0;
 
 $type = array("var","int","bool","string");
 
@@ -107,10 +107,8 @@ if(strcmp($line, ".IPPCODE18") != 0)
 {
 	exit(21);
 }
-
-$XML = new DomDocument("1.0","UTF-8");
-$prog = $XML->createElement('program');
-$prog->setAttribute('language','IPPcode18');
+echo("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+echo("<program language=\"IPPcode18\">\n");
 
 //##########################################################
 //		dictionary with all instruction
@@ -162,7 +160,6 @@ function get_symb_check($value)
 
 //##########################################################
 
-
 do{
 $line = fgets(STDIN);
 // remove coments
@@ -177,7 +174,7 @@ if(trim($line_v) != "")
 {
 	// seperating into words
 	$words = preg_split("/[\s]+/", $line_v); 
-	$count_inst += 1;
+	$count_instruction += 1;
 	//var_dump($words);
 
 	$words[0] = strtoupper($words[0]);
@@ -199,18 +196,10 @@ if(trim($line_v) != "")
 				{exit(21);} 
 			else{ 
 				$sym1 = get_symb_check($words[2]); //match <SYMB>
-				${"instr".$count_inst} = $XML->createElement('instruction');
-				${"instr".$count_inst}->setAttribute('order',$count_inst);
-				${"instr".$count_inst}->setAttribute('opcode',$words[0]);
-				$prog->appendChild(${"instr".$count_inst});
-
-				${"arg1".$count_inst} = $XML->createElement("arg1",$words[1]);
-				${"arg1".$count_inst}->setAttribute('type','var');
-				${"instr".$count_inst}->appendChild(${"arg1".$count_inst});
-
-				${"arg2".$count_inst} = $XML->createElement("arg2",reset($sym1));
-				${"arg2".$count_inst}->setAttribute('type',array_search(reset($sym1), $sym1));	
-				${"instr".$count_inst}->appendChild(${"arg2".$count_inst});
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg1 type=\"var\">$words[1]</arg1>\n");
+				echo("  <arg2 type=\"".array_search(reset($sym1), $sym1)."\">".reset($sym1)."</arg2>\n");
+				echo(" </instruction>\n");
 			}
 			break;
 		case 1: // CREATEFRAME
@@ -221,10 +210,7 @@ if(trim($line_v) != "")
 			if(count($words) != 1)
 				{exit(21);}
 			else{
-				${"instr".$count_inst} = $XML->createElement('instruction');
-				${"instr".$count_inst}->setAttribute('order',$count_inst);
-				${"instr".$count_inst}->setAttribute('opcode',$words[0]);
-				$prog->appendChild(${"instr".$count_inst});
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\"/>\n");
 			}
 			break;
 		case 4: // DEFVAR <VAR>
@@ -234,14 +220,9 @@ if(trim($line_v) != "")
 			else if(!preg_match($regex_var, $words[1])) // match <VAR>
 				{exit(21);} 
 			else{
-				${"instr".$count_inst} = $XML->createElement('instruction');
-				${"instr".$count_inst}->setAttribute('order',$count_inst);
-				${"instr".$count_inst}->setAttribute('opcode',$words[0]);
-				$prog->appendChild(${"instr".$count_inst});
-
-				${"arg1".$count_inst} = $XML->createElement("arg1",$words[1]);
-				${"arg1".$count_inst}->setAttribute('type','var');
-				${"instr".$count_inst}->appendChild(${"arg1".$count_inst});
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg1 type=\"var\">$words[1]</arg1>\n");
+				echo(" </instruction>\n");
 			}				
 			break;
 		case 5: // CALL <LABEL>
@@ -252,14 +233,9 @@ if(trim($line_v) != "")
 			else if(!preg_match($regex_label, $words[1])) // match <VAR>
 				{exit(21);} 
 			else{
-				${"instr".$count_inst} = $XML->createElement('instruction');
-				${"instr".$count_inst}->setAttribute('order',$count_inst);
-				${"instr".$count_inst}->setAttribute('opcode',$words[0]);
-				$prog->appendChild(${"instr".$count_inst});
-
-				${"arg1".$count_inst} = $XML->createElement("arg1",$words[1]);
-				${"arg1".$count_inst}->setAttribute('type','label');
-				${"instr".$count_inst}->appendChild(${"arg1".$count_inst});
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg1 type=\"label\">$words[1]</arg1>\n");
+				echo(" </instruction>\n");
 			}			
 			break;
 		case 7: // PUSHS <SYMB>
@@ -269,14 +245,9 @@ if(trim($line_v) != "")
 				{exit(21);}
 			else{
 				$sym1 = get_symb_check($words[1]); //match <SYMB>
-				${"instr".$count_inst} = $XML->createElement('instruction');
-				${"instr".$count_inst}->setAttribute('order',$count_inst);
-				${"instr".$count_inst}->setAttribute('opcode',$words[0]);
-				$prog->appendChild(${"instr".$count_inst});
-
-				${"arg1".$count_inst} = $XML->createElement("arg1",reset($sym1));
-				${"arg1".$count_inst}->setAttribute('type',array_search(reset($sym1), $sym1));	
-				${"instr".$count_inst}->appendChild(${"arg1".$count_inst});
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg2 type=\"".array_search(reset($sym1), $sym1)."\">".reset($sym1)."</arg2>\n");
+				echo(" </instruction>\n");
 			}		
 			break;
 		case 9: // ADD <VAR> <SYMB> <SYMB> 
@@ -300,22 +271,11 @@ if(trim($line_v) != "")
 			else{ 
 				$sym1 = get_symb_check($words[2]); //match <SYMB>
 				$sym2 = get_symb_check($words[3]); //match <SYMB>
-				${"instr".$count_inst} = $XML->createElement('instruction');
-				${"instr".$count_inst}->setAttribute('order',$count_inst);
-				${"instr".$count_inst}->setAttribute('opcode',$words[0]);
-				$prog->appendChild(${"instr".$count_inst});
-
-				${"arg1".$count_inst} = $XML->createElement("arg1",$words[1]);
-				${"arg1".$count_inst}->setAttribute('type','var');
-				${"instr".$count_inst}->appendChild(${"arg1".$count_inst});
-
-				${"arg2".$count_inst} = $XML->createElement("arg2",reset($sym1));
-				${"arg2".$count_inst}->setAttribute('type',array_search(reset($sym1), $sym1));	
-				${"instr".$count_inst}->appendChild(${"arg2".$count_inst});
-
-				${"arg3".$count_inst} = $XML->createElement("arg3",reset($sym2));
-				${"arg3".$count_inst}->setAttribute('type',array_search(reset($sym2), $sym2));	
-				${"instr".$count_inst}->appendChild(${"arg3".$count_inst});
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg1 type=\"var\">$words[1]</arg1>\n");
+				echo("  <arg2 type=\"".array_search(reset($sym1), $sym1)."\">".reset($sym1)."</arg2>\n");
+				echo("  <arg3 type=\"".array_search(reset($sym2), $sym2)."\">".reset($sym2)."</arg3>\n");
+				echo(" </instruction>\n");
 			}			
 			break;
 		case 21: //READ <VAR> <TYPE>
@@ -326,18 +286,10 @@ if(trim($line_v) != "")
 			else if(!preg_match($regex_type, $words[2]))
 				{exit(21);}
 			else{ 
-				${"instr".$count_inst} = $XML->createElement('instruction');
-				${"instr".$count_inst}->setAttribute('order',$count_inst);
-				${"instr".$count_inst}->setAttribute('opcode',$words[0]);
-				$prog->appendChild(${"instr".$count_inst});
-
-				${"arg1".$count_inst} = $XML->createElement("arg1",$words[1]);
-				${"arg1".$count_inst}->setAttribute('type','var');
-				${"instr".$count_inst}->appendChild(${"arg1".$count_inst});
-
-				${"arg2".$count_inst} = $XML->createElement("arg2",$words[2]);
-				${"arg2".$count_inst}->setAttribute('type','type');
-				${"instr".$count_inst}->appendChild(${"arg2".$count_inst});
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg1 type=\"var\">$words[1]</arg1>\n");
+				echo("  <arg2 type=\"type\">$words[2]</arg2>\n");
+				echo(" </instruction>\n");
 			}			
 			break;
 		case 30: // JUMPIFEQ <LABEL> <SYMB> <SYMB>
@@ -349,23 +301,11 @@ if(trim($line_v) != "")
 			else{ 
 				$sym1 = get_symb_check($words[2]); //match <SYMB>
 				$sym2 = get_symb_check($words[3]); //match <SYMB>
-		
-				${"instr".$count_inst} = $XML->createElement('instruction');
-				${"instr".$count_inst}->setAttribute('order',$count_inst);
-				${"instr".$count_inst}->setAttribute('opcode',$words[0]);
-				$prog->appendChild(${"instr".$count_inst});
-
-				${"arg1".$count_inst} = $XML->createElement("arg1",$words[1]);
-				${"arg1".$count_inst}->setAttribute('type','label');
-				${"instr".$count_inst}->appendChild(${"arg1".$count_inst});
-
-				${"arg2".$count_inst} = $XML->createElement("arg2",reset($sym1));
-				${"arg2".$count_inst}->setAttribute('type',array_search(reset($sym1), $sym1));	
-				${"instr".$count_inst}->appendChild(${"arg2".$count_inst});
-
-				${"arg3".$count_inst} = $XML->createElement("arg3",reset($sym2));
-				${"arg3".$count_inst}->setAttribute('type',array_search(reset($sym2), $sym2));	
-				${"instr".$count_inst}->appendChild(${"arg3".$count_inst});		
+				echo(" <instruction order=\"$count_instruction\" opcode=\"$words[0]\">\n");
+				echo("  <arg1 type=\"label\">$words[1]</arg1>\n");
+				echo("  <arg2 type=\"".array_search(reset($sym1), $sym1)."\">".reset($sym1)."</arg2>\n");
+				echo("  <arg3 type=\"".array_search(reset($sym2), $sym2)."\">".reset($sym2)."</arg3>\n");
+				echo(" </instruction>\n");
 			}					
 			break;
 															
@@ -376,35 +316,31 @@ if(trim($line_v) != "")
 
 }while($line);
 
-
-$XML->appendChild($prog);
-$XML->formatOutput = true;
-
-echo($XML->saveXML());
 //var_dump($count_comments);
-//var_dump($count_inst);
+//var_dump($count_instruction);
 if(array_key_exists("stats", $args))
 {
-	if(($index_comm != -1)&&($index_loc != -1))
+	if(($count_comments != -1)&&($count_instruction != -1))
 	{
-		if($index_loc > $index_comm)
+		if($count_instruction > $count_comments)
 		{
-			fwrite($out, "$count_inst\n$count_comments\n");
+			fwrite($out, "$count_instruction\n$count_comments\n");
 		}
 		else{
-			fwrite($out, "$count_comments\n$count_inst\n");
+			fwrite($out, "$count_comments\n$count_instruction\n");
 		}
 	}
-	else if($index_comm != -1)
+	else if($count_comments != -1)
 	{
 		fwrite($out, "$count_comments\n");
 	}
-	else if($index_loc != -1)
+	else if($count_instruction != -1)
 	{
-		fwrite($out, "$count_inst\n");	
+		fwrite($out, "$count_instruction\n");	
 	}
 
 	fclose($out);
 }
+echo("</program>\n");
 exit(0);
 ?>
