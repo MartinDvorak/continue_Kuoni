@@ -1,19 +1,19 @@
 <?php  
 
 //####################################################
-//			 	PARAMS 
+//			 	ARGS
 $longopts  = array(
     "help",     // help
-    "stats:",    // must have one parameter
-    "comments",        // without parameter
-    "loc",           // without parameter
+    "stats:",   // must have one parameter
+    "comments",	// without parameter
+    "loc",     	// without parameter
 );
 $index_comm = -1; // -1 not set
 $index_loc = -1; // -1 not set
 
 $args = getopt("", $longopts);
 
-if(count($args) != 0)
+if(count($argv) != 1)
 {
 if (count($args)+1 != count($argv))
 	{
