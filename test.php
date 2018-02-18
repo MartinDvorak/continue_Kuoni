@@ -10,10 +10,9 @@ $longopts  = array(
     "int-script:",		// must have one parameter
 );
 
-
 $test_dir= "./";
-$parse_file = "./";
-$inter_file = "./";
+$parse_file = "./parser.php";
+$inter_file = "./interpret.py";
 $recursive = false;
 
 $args = getopt("", $longopts);
@@ -69,6 +68,56 @@ else{
 
 echo("HELL\n");
 
+
+
+//####################################################
+function recursive_dir($regex,$dir,$path)
+{
+	global $all_tests;
+	$local_dir = scandir($dir);
+
+	foreach($local_dir as $file)
+	{
+		if(is_dir($file)&&($file != '..' ) && ($file != '.'))
+		{
+			recursive_dir($regex,$file,$path."/".$file);
+		}
+		else if(preg_match($regex, $file))
+		{	
+			array_push($all_tests, $path."/".$file);
+		}			
+	}
+
+}
+
+//####################################################
+// 			REGEX
+
+$regex_src = '/.+\.src$/';
+$all_tests = array();
+
+if($recursive)
+{
+	recursive_dir($regex_src,$test_dir,".");
+}
+else{
+	$local_dir = scandir($test_dir);
+	foreach($local_dir as $file)
+	{
+		if(preg_match($regex_src, $file))
+		{	
+			array_push($all_tests, $file);
+		}			
+	}
+}
+
+foreach ($all_tests as $test) {
+	$out = shell_exec("php5.6 $parse_file < $test");
+	var_dump($out);
+}
+var_dump($all_tests)
+
+//http://php.net/manual/en/function.exec.php
 //####################################################
 
 ?>

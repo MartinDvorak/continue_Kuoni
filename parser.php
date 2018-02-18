@@ -35,7 +35,7 @@ výstup XML reprezentaci programu dle specifikace\n");
 	else if(array_key_exists("stats", $args))
 		{
 			if(($out = fopen($args["stats"], "w")) == false)
-			{exit(10);}
+			{exit(12);}
 		}	
 	else{
 		exit(10);
@@ -50,7 +50,7 @@ else{
 	{
 		if(($out = fopen($args["stats"], "w")) == false)
 		{	
-			exit(10);
+			exit(12);
 		}
 		if(array_key_exists("loc", $args))
 		{
@@ -406,5 +406,6 @@ if(array_key_exists("stats", $args))
 
 	fclose($out);
 }
+
 exit(0);
 ?>
