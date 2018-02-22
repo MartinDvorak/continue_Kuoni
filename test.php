@@ -153,6 +153,14 @@ foreach ($test_dir as $dir)
 
 //var_dump($all_tests);
 //####################################################
+// 				Result HTML v.5
+
+if(!($html = fopen("results.html", "w")))
+{
+	exit(12);	
+}
+
+//####################################################
 // 				Testing Files
 
 foreach ($all_tests as $test) {
@@ -169,7 +177,7 @@ foreach ($all_tests as $test) {
 	{
 		exit(11);
 	}
-	
+	// get return code from *.rc or generate it
 	if(filesize(substr($test, 0,-3)."rc") == 0)
 	{
 		fwrite($rc, "0\n");
@@ -186,7 +194,7 @@ foreach ($all_tests as $test) {
 		if(is_file($parse_file))
 	{
 		exec("php5.6 $parse_file < $test",$out_parse,$ret_parse);
-		
+		//exit code from parse.php
 		if($ret_parse != 0)
 		{
 			if($ret_parse == $return_code)
@@ -200,7 +208,7 @@ foreach ($all_tests as $test) {
 			}
 		}
 		else{
-
+		// tmp file becouse interpret.py must have input from --source=file
 		if(!($tmp_file = fopen(substr($test, 0,-3)."tmp", "w")))
 		{
 			exit(99);
@@ -209,16 +217,26 @@ foreach ($all_tests as $test) {
 		fwrite($tmp_file, implode("\n",$out_parse));
 		$source_name = substr($test, 0,-3)."tmp";
 		$input_name = substr($test, 0,-3)."in";
+		$out_name = substr($test, 0,-3)."out";
+		$out_py = substr($test, 0,-3)."inter";
+		
 		fclose($tmp_file);
 
+		// TESTING interpret.py by default or --int-script=file
 		if(is_file($inter_file))
 		{
-			exec("python3.6 $inter_file --source=$source_name < $input_name",$out_inter,$ret_inter); 
-			
+			exec("python3.6 $inter_file --source=$source_name < $input_name > $out_py",$out_inter,$ret_inter); 
+			//exit code from interpret.py
 			if($ret_inter == $return_code)
 			{
-				// TODO USPECH
-				echo("USPECH .py\n");
+				exec("diff $out_name $out_py",$out_diff,$ret_diff);
+				if($out_diff = "")
+				{
+					echo("USPECH .py\n");
+				}
+				else{
+					echo("chyba na vystupu\n");
+				}
 			}
 			else{
 				// NEUSPECH TESTU
@@ -226,6 +244,7 @@ foreach ($all_tests as $test) {
 			}
 			//var_dump($out_inter);
 		}
+		// remove tmp file
 		unlink($source_name);
 		}
 	}
@@ -233,7 +252,6 @@ foreach ($all_tests as $test) {
 
 
 
-//http://php.net/manual/en/function.exec.php
 //####################################################
 
 ?>
