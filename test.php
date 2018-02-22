@@ -8,12 +8,16 @@ $longopts  = array(
     "recursive",        // without parameter
     "parse-script:",	// must have one parameter
     "int-script:",		// must have one parameter
+    "testlist:",		// must have one parameter
+    "match:",			// must have one parameter
 );
 
-$test_dir= "./";
+$test_dir= ".";
 $parse_file = "./parser.php";
 $inter_file = "./interpret.py";
 $recursive = false;
+$testlist = false;
+$regex_file = '/.*/';
 
 $args = getopt("", $longopts);
 
@@ -23,7 +27,7 @@ if (count($args)+1 != count($argv))
 	{
 		exit(10);
 	}	
-else if (array_key_exists("help", $args))
+if (array_key_exists("help", $args))
 	{	
 		if(count($args) != 1)
 		{
@@ -45,77 +49,189 @@ adresáři)\n");
 		exit(0);
 		}
 	}
-else if(array_key_exists("directory", $args))	
+if((array_key_exists("directory", $args))&&(!array_key_exists("testlist", $args)))	
 	{
 		$test_dir = $args["directory"];
 	}
-else if(array_key_exists("recursive", $args))	
+else if((!array_key_exists("directory", $args))&&(array_key_exists("testlist", $args)))	
+	{
+		$testlist = true;
+		if(($list = fopen($args["testlist"],"r"))==false)
+		{exit (11);}	
+	}
+else if(((array_key_exists("directory", $args))&&(array_key_exists("testlist", $args))))
+	{
+		exit(10);
+	}	
+
+if(array_key_exists("recursive", $args))	
 	{
 		$recursive = true;
 	}
-else if(array_key_exists("parse-script", $args))	
+if(array_key_exists("parse-script", $args))	
 	{
 		$parse_file = $args["parse-script"];
 	}
-else if(array_key_exists("int-script", $args))	
+if(array_key_exists("int-script", $args))	
 	{
 		$inter_file = $args["int-script"];
-	}		
-else{
-	exit(10);
-	}	
-}
-
-echo("HELL\n");
-
-
-
-//####################################################
-function recursive_dir($regex,$dir,$path)
-{
-	global $all_tests;
-	$local_dir = scandir($dir);
-
-	foreach($local_dir as $file)
+	}			
+if(array_key_exists("match", $args))
 	{
-		if(is_dir($file)&&($file != '..' ) && ($file != '.'))
-		{
-			recursive_dir($regex,$file,$path."/".$file);
-		}
-		else if(preg_match($regex, $file))
-		{	
-			array_push($all_tests, $path."/".$file);
-		}			
+		$regex_file =  $args["match"];
 	}
-
 }
-
 //####################################################
-// 			REGEX
+// 			GET FILES
+// 		\x2F	/
 
 $regex_src = '/.+\.src$/';
-$all_tests = array();
+$regex_remove_path = '/^.*\x2F/';
+$all_tests = array(); 
 
-if($recursive)
+
+// PARARAM --testlist=file
+if($testlist)
 {
-	recursive_dir($regex_src,$test_dir,".");
+	$input = fread($list, filesize($args["testlist"]));
+	$items = preg_split("/\n/",$input);
+	$test_dir = $items;
+	var_dump($items);
 }
 else{
-	$local_dir = scandir($test_dir);
-	foreach($local_dir as $file)
+	$test_dir = str_split($test_dir, strlen($test_dir));
+}
+
+// because of --testlist=file
+foreach ($test_dir as $dir) 
+{
+	// $dir is file
+	if(is_file($dir))
 	{
-		if(preg_match($regex_src, $file))
+		if(preg_match($regex_src, $dir))
 		{	
-			array_push($all_tests, $file);
-		}			
+			$no_path = preg_replace($regex_remove_path, "", $dir);
+			if(preg_match($regex_file, substr($no_path, 0, -4)))
+				$all_tests[] = $dir; 
+		}
+		continue;
+	}
+	// empty line
+	if(trim($dir) == "")
+	{continue;}
+
+	// becouse of --recursive
+	if($recursive)
+	{
+		$iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
+
+		foreach ($iterator as $file) 
+		{
+			if ($file->isDir())
+				{ continue;}
+			if(preg_match($regex_src, $file))
+			{	
+				if(preg_match($regex_file, substr($file, 0, -4)))
+					$all_tests[] = $file->getPathname(); 
+			}	
+		}
+	}
+	// none recursive param
+	else{
+		$local_dir = scandir($dir);
+		foreach ($local_dir as $file) 
+		{
+			if(preg_match($regex_src, $file))
+			{	
+				if(preg_match($regex_file, substr($file, 0, -4)))
+					$all_tests[] = "./".$file; 
+			}
+		}
+
 	}
 }
 
+//var_dump($all_tests);
+//####################################################
+// 				Testing Files
+
 foreach ($all_tests as $test) {
-	$out = shell_exec("php5.6 $parse_file < $test");
-	var_dump($out);
+	// check all files *.in *.out *.rc and set *.rc file.
+	if(!($in = fopen(substr($test, 0,-3)."in", "c+")))
+	{
+		exit(11);
+	}
+	if(!($out = fopen(substr($test, 0,-3)."out", "c+")))
+	{
+		exit(11);
+	}
+	if(!($rc = fopen(substr($test, 0,-3)."rc", "c+")))
+	{
+		exit(11);
+	}
+	
+	if(filesize(substr($test, 0,-3)."rc") == 0)
+	{
+		fwrite($rc, "0\n");
+		$return_code = 0;
+	}
+	else{
+		$return_code = intval(fread($rc,filesize(substr($test, 0,-3)."rc")));
+	}
+	fclose($in);
+	fclose($out);
+	fclose($rc);
+
+	// TESTING parse.php by default or --parse-script=file
+		if(is_file($parse_file))
+	{
+		exec("php5.6 $parse_file < $test",$out_parse,$ret_parse);
+		
+		if($ret_parse != 0)
+		{
+			if($ret_parse == $return_code)
+			{
+				// TODO USPECH
+				echo("USPECH .php\n");
+			}
+			else{
+				// NEUSPECH TESTU
+				echo("NOP .php\n");
+			}
+		}
+		else{
+
+		if(!($tmp_file = fopen(substr($test, 0,-3)."tmp", "w")))
+		{
+			exit(99);
+		}
+
+		fwrite($tmp_file, implode("\n",$out_parse));
+		$source_name = substr($test, 0,-3)."tmp";
+		$input_name = substr($test, 0,-3)."in";
+		fclose($tmp_file);
+
+		if(is_file($inter_file))
+		{
+			exec("python3.6 $inter_file --source=$source_name < $input_name",$out_inter,$ret_inter); 
+			
+			if($ret_inter == $return_code)
+			{
+				// TODO USPECH
+				echo("USPECH .py\n");
+			}
+			else{
+				// NEUSPECH TESTU
+				echo("NOP .py\n");
+			}
+			//var_dump($out_inter);
+		}
+		unlink($source_name);
+		}
+	}
 }
-var_dump($all_tests)
+
+
 
 //http://php.net/manual/en/function.exec.php
 //####################################################

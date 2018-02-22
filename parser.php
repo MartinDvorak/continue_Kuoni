@@ -115,7 +115,7 @@ $prog->setAttribute('language','IPPcode18');
 //##########################################################
 //		dictionary with all instruction
 $instr_set = array("MOVE","CREATEFRAME","PUSHFRAME","POPFRAME","DEFVAR","CALL",
-	"RETURN","PUSHS","POPS","ADD","SUB","MUL","IDIV","LT","GT","EQ","AND","OR","NOT",
+	"exit","PUSHS","POPS","ADD","SUB","MUL","IDIV","LT","GT","EQ","AND","OR","NOT",
 	"INT2CHAR","STRI2INT","READ","WRITE","CONCAT","STRLEN","GETCHAR","SETCHAR","TYPE",
 	"LABEL","JUMP","JUMPIFEQ","JUMPIFNEQ","DPRINT","BREAK"
 	);
@@ -216,7 +216,7 @@ if(trim($line_v) != "")
 		case 1: // CREATEFRAME
 		case 2:	// PUSHFRAME
 		case 3: // POPFRAME
-		case 6: // RETURN
+		case 6: // exit
 		case 33: // BREAK
 			if(count($words) != 1)
 				{exit(21);}
