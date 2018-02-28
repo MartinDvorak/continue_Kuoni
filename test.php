@@ -13,7 +13,7 @@ $longopts  = array(
 );
 
 $test_dir= ".";
-$parse_file = "./parser.php";
+$parse_file = "./parse.php";
 $inter_file = "./interpret.py";
 $recursive = false;
 $testlist = false;
@@ -96,7 +96,7 @@ if($testlist)
 	$input = fread($list, filesize($args["testlist"]));
 	$items = preg_split("/\n/",$input);
 	$test_dir = $items;
-	var_dump($items);
+	//var_dump($items);
 }
 else{
 	$test_dir = str_split($test_dir, strlen($test_dir));
@@ -155,15 +155,137 @@ foreach ($test_dir as $dir)
 //####################################################
 // 				Result HTML v.5
 
-if(!($html = fopen("results.html", "w")))
+function html_head($count,$success,$fail)
 {
-	exit(12);	
+	if($count == 0)
+		$percent = 0;
+	else
+		$percent = round(($success / $count)*100);
+
+echo("<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset=\"UTF-8\">
+<title>IPP proj1 testování</title>
+
+<style>
+
+body{
+	background-color: BurlyWood;
+}
+
+div.page{
+	margin: auto;
+	width: 1024px;
+	position: relative;
+	padding: 10px;
+	background-color: linen;
+	border-radius: 20px;
+	font-size: 18px;
+	color: Chocolate ;
+	text-align: center;
+}
+
+div.text{
+	margin: auto;
+	width: 400px;
+	position: relative;
+	font-size: 18px;
+	color: Chocolate ;
+	text-align: left;
+}
+
+h1{
+	color: maroon;
+	margin: 40px;
+	text-align: center;
+	font-size: 35px;
+}
+
+h3{
+	color: maroon;
+	font-size: 25px;
+	text-align: center;
+}
+
+div.tail{
+	font-size: 20px;
+	color: maroon;
+	text-align: right;
+	margin-right: 20px;
+
+}
+
+small.tick{
+	color: green;
+	font-size: 25px;
+}
+
+small.cross{
+	color: red;
+	font-size: 25px;
+}
+small.result{
+	color: black;
+	font-size: 18px;
+}
+</style>
+</head>
+
+<body>
+<div class=\"page\">	
+<h1>Souhrn a hodnocení testů k projektu do předmětu IPP 2018</h1>
+
+<div class=\"text\">
+
+
+<h3>
+Souhrn všech testů
+</h3>
+
+<p>
+	Celkový počet testů: <small class=\"result\"> $count</small><br>
+	Počet úspěšných testů: <small class=\"result\"> $success</small><small class=\"tick\">&#x2714</small><br>
+	Počet neúspěšných testů: <small class=\"result\"> $fail</small><small class=\"cross\">&#x2717</small><br>
+	Procentuální úspěšnost: <small class=\"result\"> $percent%</small><br>
+</p>
+
+<h3>
+Jednotlivé testy	
+</h3>");
+} 
+
+
+function html_res_test($count,$name ,$expecter,$returned,$info,$result)
+{
+	$name = substr($name, 0,-4);
+	global $html_tmp;
+	fwrite($html_tmp, "<p>
+	Test <small class=\"result\"> $count</small> $result <br>
+	Jméno a cesta: <small class=\"result\"> $name</small><br>
+	Očekáváná návratová hodnota: <small class=\"result\">$expecter</small><br>
+	Získaná návratová hodnota:<small class=\"result\">$returned</small> <br>
+	Další informace: <small class=\"result\">$info</small><br>
+</p>");
+
 }
 
 //####################################################
 // 				Testing Files
+$cross = 0;
+$tick = 0;
+$count = 0;
+$succes_test = '<small class="tick">&#x2714</small>';
+$fail_test = '<small class="cross">&#x2717</small>';
+$html_tmp = tmpfile();
 
 foreach ($all_tests as $test) {
+	// file inst exists
+	if(!file_exists($test))
+	{
+		continue;
+	}
 	// check all files *.in *.out *.rc and set *.rc file.
 	if(!($in = fopen(substr($test, 0,-3)."in", "c+")))
 	{
@@ -190,8 +312,10 @@ foreach ($all_tests as $test) {
 	fclose($out);
 	fclose($rc);
 
+	$count += 1;
+
 	// TESTING parse.php by default or --parse-script=file
-		if(is_file($parse_file))
+	if(is_file($parse_file))
 	{
 		exec("php5.6 $parse_file < $test",$out_parse,$ret_parse);
 		//exit code from parse.php
@@ -199,12 +323,14 @@ foreach ($all_tests as $test) {
 		{
 			if($ret_parse == $return_code)
 			{
-				// TODO USPECH
-				echo("USPECH .php\n");
+				// USPECH
+				html_res_test($count,$test,$return_code,$ret_parse,"Test pro kontrolu $parse_file",$succes_test);
+				$tick += 1;
 			}
 			else{
 				// NEUSPECH TESTU
-				echo("NOP .php\n");
+				html_res_test($count,$test,$return_code,$ret_parse,"Test pro kontrolu $parse_file",$fail_test);
+				$cross += 1;
 			}
 		}
 		else{
@@ -232,25 +358,58 @@ foreach ($all_tests as $test) {
 				exec("diff $out_name $out_py",$out_diff,$ret_diff);
 				if($out_diff = "")
 				{
-					echo("USPECH .py\n");
+					// test cely OK
+					html_res_test($count,$test,$return_code,$ret_inter,"Test probehl v poradku",$succes_test);
+					$tick += 1;
 				}
 				else{
-					echo("chyba na vystupu\n");
+					// NESPECH DIFF
+					html_res_test($count,$test,$return_code,$ret_inter,"Neshoda vystupu $inter_file a referencniho *.out souboru",$fail_test);
+					$cross += 1;
 				}
 			}
 			else{
 				// NEUSPECH TESTU
-				echo("NOP .py\n");
+				html_res_test($count,$test,$return_code,$ret_inter,"Neschoda navratvych kodu",$fail_test);
+				$cross += 1;
 			}
 			//var_dump($out_inter);
+			unlink($out_py);	
+		}
+		else{
+			html_res_test($count,$test,$return_code,'<small class="cross">x</small>',"Nenalezen soubor pro interpretaci",$fail_test);
+			$cross += 1;
+
 		}
 		// remove tmp file
 		unlink($source_name);
 		}
 	}
+	else{
+		html_res_test($count,$test,$return_code,'<small class="cross">x</small>',"Nenalezen soubor pro parsování vstupu",$fail_test);
+		$cross += 1;
+	}
 }
 
+fseek($html_tmp, 0);
+//	var_dump(fstat($html_tmp)["size"]);
+//	var_dump(fread($html_tmp,1024));
 
+html_head($count,$tick,$cross);
+
+if(fstat($html_tmp)["size"] != 0)
+	echo(fread($html_tmp,fstat($html_tmp)["size"]));
+	
+	// TAIL
+echo('
+	</div>
+		<div class="tail">
+		<b>Dvořák Martin, xdvora2l 2018</b> 
+	</div>
+	</div>
+	</body>
+	
+	</html>');
 
 //####################################################
 
