@@ -12,7 +12,7 @@ $longopts  = array(
     "match:",			// must have one parameter
 );
 
-$test_dir= ".";
+$test_dir= "./";
 $parse_file = "./parse.php";
 $inter_file = "./interpret.py";
 $recursive = false;
@@ -120,6 +120,8 @@ foreach ($test_dir as $dir)
 	if(trim($dir) == "")
 	{continue;}
 
+	if(is_dir($dir))
+	{
 	// becouse of --recursive
 	if($recursive)
 	{
@@ -131,7 +133,8 @@ foreach ($test_dir as $dir)
 				{ continue;}
 			if(preg_match($regex_src, $file))
 			{	
-				if(preg_match($regex_file, substr($file, 0, -4)))
+				$without_path = preg_replace('/^.*\x2F/', "", $file);		
+				if(preg_match($regex_file, substr($without_path, 0, -4)))
 					$all_tests[] = $file->getPathname(); 
 			}	
 		}
@@ -140,14 +143,15 @@ foreach ($test_dir as $dir)
 	else{
 		$local_dir = scandir($dir);
 		foreach ($local_dir as $file) 
-		{
+		{		
 			if(preg_match($regex_src, $file))
 			{	
 				if(preg_match($regex_file, substr($file, 0, -4)))
-					$all_tests[] = "./".$file; 
+					$all_tests[] = $dir."/".$file; 
 			}
 		}
 
+	}
 	}
 }
 
@@ -167,7 +171,7 @@ echo("<!DOCTYPE html>
 <head>
 
 <meta charset=\"UTF-8\">
-<title>IPP proj1 testování</title>
+<title>IPP proj1 testovani</title>
 
 <style>
 
@@ -235,24 +239,24 @@ small.result{
 
 <body>
 <div class=\"page\">	
-<h1>Souhrn a hodnocení testů k projektu do předmětu IPP 2018</h1>
+<h1>Souhrn a hodnoceni testu k projektu do predmetu IPP 2018</h1>
 
 <div class=\"text\">
 
 
 <h3>
-Souhrn všech testů
+Souhrn vsech testu
 </h3>
 
 <p>
-	Celkový počet testů: <small class=\"result\"> $count</small><br>
-	Počet úspěšných testů: <small class=\"result\"> $success</small><small class=\"tick\">&#x2714</small><br>
-	Počet neúspěšných testů: <small class=\"result\"> $fail</small><small class=\"cross\">&#x2717</small><br>
-	Procentuální úspěšnost: <small class=\"result\"> $percent%</small><br>
+	Celkovy pocet testu: <small class=\"result\"> $count</small><br>
+	Pocet uspesnych testu: <small class=\"result\"> $success</small><small class=\"tick\">&#x2714</small><br>
+	Pocet neuspesnych testu: <small class=\"result\"> $fail</small><small class=\"cross\">&#x2717</small><br>
+	Procentualni uspesnost: <small class=\"result\"> $percent%</small><br>
 </p>
 
 <h3>
-Jednotlivé testy	
+Jednotlive testy	
 </h3>");
 } 
 
@@ -263,10 +267,10 @@ function html_res_test($count,$name ,$expecter,$returned,$info,$result)
 	global $html_tmp;
 	fwrite($html_tmp, "<p>
 	Test <small class=\"result\"> $count</small> $result <br>
-	Jméno a cesta: <small class=\"result\"> $name</small><br>
-	Očekáváná návratová hodnota: <small class=\"result\">$expecter</small><br>
-	Získaná návratová hodnota:<small class=\"result\">$returned</small> <br>
-	Další informace: <small class=\"result\">$info</small><br>
+	Jmeno a cesta: <small class=\"result\"> $name</small><br>
+	Ocekavana navratova hodnota: <small class=\"result\">$expecter</small><br>
+	Ziskana navratova hodnota:<small class=\"result\">$returned</small> <br>
+	Dalsi informace: <small class=\"result\">$info</small><br>
 </p>");
 
 }
@@ -280,12 +284,14 @@ $succes_test = '<small class="tick">&#x2714</small>';
 $fail_test = '<small class="cross">&#x2717</small>';
 $html_tmp = tmpfile();
 
+
 foreach ($all_tests as $test) {
 	// file inst exists
-	if(!file_exists($test))
-	{
-		continue;
-	}
+	
+	//if(!file_exists($test))
+	//{
+	//	continue;
+	//}
 	// check all files *.in *.out *.rc and set *.rc file.
 	if(!($in = fopen(substr($test, 0,-3)."in", "c+")))
 	{
@@ -313,10 +319,11 @@ foreach ($all_tests as $test) {
 	fclose($rc);
 
 	$count += 1;
-
+	//var_dump($test);
 	// TESTING parse.php by default or --parse-script=file
 	if(is_file($parse_file))
 	{
+
 		exec("php5.6 $parse_file < $test",$out_parse,$ret_parse);
 		//exit code from parse.php
 		if($ret_parse != 0)
@@ -370,7 +377,7 @@ foreach ($all_tests as $test) {
 			}
 			else{
 				// NEUSPECH TESTU
-				html_res_test($count,$test,$return_code,$ret_inter,"Neschoda navratvych kodu",$fail_test);
+				html_res_test($count,$test,$return_code,$ret_inter,"Neschoda navratovych kodu",$fail_test);
 				$cross += 1;
 			}
 			//var_dump($out_inter);
@@ -386,7 +393,7 @@ foreach ($all_tests as $test) {
 		}
 	}
 	else{
-		html_res_test($count,$test,$return_code,'<small class="cross">x</small>',"Nenalezen soubor pro parsování vstupu",$fail_test);
+		html_res_test($count,$test,$return_code,'<small class="cross">x</small>',"Nenalezen soubor pro parsovani vstupu",$fail_test);
 		$cross += 1;
 	}
 }
@@ -404,7 +411,7 @@ if(fstat($html_tmp)["size"] != 0)
 echo('
 	</div>
 		<div class="tail">
-		<b>Dvořák Martin, xdvora2l 2018</b> 
+		<b>Dvorak Martin, xdvora2l 2018</b> 
 	</div>
 	</div>
 	</body>

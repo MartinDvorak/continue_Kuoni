@@ -1,0 +1,11 @@
+.IpPcoDE18
+
+move GF@aaa  int@-2
+#zde je chyba ceka 2param
+strlen LF@bb
+defvar GF@readme
+read GF@readme int
+write GF@readme
+
+getchar GF@readme string@asd%_A_%dsa int@2
+####

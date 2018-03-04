@@ -140,7 +140,7 @@ function get_symb_check($value)
 
 	if(preg_match($regex_var, $value))
 		{
-			return array("var" => $value);
+			return array("var" => xml_special_key($value));
 		}
 	else if(preg_match($regex_string_lit, $value))
 		{
@@ -203,7 +203,7 @@ if(trim($line_v) != "")
 				${"instr".$count_inst}->setAttribute('opcode',$words[0]);
 				$prog->appendChild(${"instr".$count_inst});
 
-				${"arg1".$count_inst} = $XML->createElement("arg1",$words[1]);
+				${"arg1".$count_inst} = $XML->createElement("arg1",xml_special_key($words[1]));
 				${"arg1".$count_inst}->setAttribute('type','var');
 				${"instr".$count_inst}->appendChild(${"arg1".$count_inst});
 
@@ -238,7 +238,7 @@ if(trim($line_v) != "")
 				${"instr".$count_inst}->setAttribute('opcode',$words[0]);
 				$prog->appendChild(${"instr".$count_inst});
 
-				${"arg1".$count_inst} = $XML->createElement("arg1",$words[1]);
+				${"arg1".$count_inst} = $XML->createElement("arg1",xml_special_key($words[1]));
 				${"arg1".$count_inst}->setAttribute('type','var');
 				${"instr".$count_inst}->appendChild(${"arg1".$count_inst});
 			}				
@@ -248,7 +248,7 @@ if(trim($line_v) != "")
 		case 29: // JUMP <LABEL>
 			if(count($words) != 2)
 				{exit(21);}
-			else if(!preg_match($regex_label, $words[1])) // match <VAR>
+			else if(!preg_match($regex_label, $words[1])) 
 				{exit(21);} 
 			else{
 				${"instr".$count_inst} = $XML->createElement('instruction');
@@ -304,7 +304,7 @@ if(trim($line_v) != "")
 				${"instr".$count_inst}->setAttribute('opcode',$words[0]);
 				$prog->appendChild(${"instr".$count_inst});
 
-				${"arg1".$count_inst} = $XML->createElement("arg1",$words[1]);
+				${"arg1".$count_inst} = $XML->createElement("arg1",xml_special_key($words[1]));
 				${"arg1".$count_inst}->setAttribute('type','var');
 				${"instr".$count_inst}->appendChild(${"arg1".$count_inst});
 
@@ -330,7 +330,7 @@ if(trim($line_v) != "")
 				${"instr".$count_inst}->setAttribute('opcode',$words[0]);
 				$prog->appendChild(${"instr".$count_inst});
 
-				${"arg1".$count_inst} = $XML->createElement("arg1",$words[1]);
+				${"arg1".$count_inst} = $XML->createElement("arg1",xml_special_key($words[1]));
 				${"arg1".$count_inst}->setAttribute('type','var');
 				${"instr".$count_inst}->appendChild(${"arg1".$count_inst});
 
@@ -383,10 +383,10 @@ echo($XML->saveXML());
 //var_dump($count_comments);
 //var_dump($count_inst);
 if(array_key_exists("stats", $args))
-{
+{	
 	if(($index_comm != -1)&&($index_loc != -1))
 	{
-		if($index_loc > $index_comm)
+		if($index_loc < $index_comm)
 		{
 			fwrite($out, "$count_inst\n$count_comments\n");
 		}
