@@ -1,8 +1,0 @@
-.IPPcode18
-
-DEFVAR GF@neco&dalsi
-ADD GF@neco&dalsi GF@neco&dalsi GF@neco&dalsi
-PUSHS GF@neco&dalsi
-MOVE GF@neco&dalsi GF@neco&dalsi
-READ GF@neco&dalsi int
-JUMPIFEQ here GF@neco&dalsi GF@neco&dalsi
