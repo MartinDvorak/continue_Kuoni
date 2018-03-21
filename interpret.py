@@ -2,6 +2,7 @@
 import sys
 import getopt
 import xml.etree.ElementTree as ET
+import re
 
 def get_descriptor(file):
 	"""For bound root i xml from STDIN or external file, 
@@ -23,8 +24,46 @@ def get_descriptor(file):
 			sys.exit(31)
 
 def regex_match(get_non_term,value, ref_non_terminal):
-	return True
+	regex_var = r'^(GF|LF|TF)\x40([a-zA-Z]|\x5F|\x2D|\x24|\x25|\x26|\x2A)(\w|\x5F|\x2D|\x24|\x25|\x26|\x2A)*$'
+	regex_label = r'^([a-zA-Z]|\x5F|\x2D|\x24|\x25|\x26|\x2A)(\w|\x5F|\x2D|\x24|\x25|\x26|\x2A)*$'
+	regex_int = r'^(\x2D|\x2B)?\d+$'
+	regex_bool = r'^(true|false)$'
+	regex_string = r'^((\x5C\d{3})|[^\x23\s\x5C])*$'
+	regex_type = r'^(int|bool|string)$'
 
+	if(get_non_term == 'string') and (value == None):
+		value = ""
+	regex = None
+	if(get_non_term == ref_non_terminal):
+		
+		if(ref_non_terminal == 'label'):
+			regex = re.match(regex_label,value)
+		elif(ref_non_terminal == 'var'):
+			regex = re.match(regex_var,value)
+		elif(ref_non_terminal == 'string'):
+			regex = re.match(regex_string,value)
+		elif(ref_non_terminal == 'int'):
+			regex = re.match(regex_int,value)
+		elif(ref_non_terminal == 'bool'):
+			regex = re.match(regex_bool,value)
+		elif(ref_non_terminal == 'type'):
+			regex = re.match(regex_type,value)
+	else:
+		if(ref_non_terminal == 'symb'):
+			if(get_non_term == 'var'):
+				regex = re.match(regex_var,value)
+			elif(get_non_term == 'int'):
+				regex = re.match(regex_int,value)
+			elif(get_non_term == 'string'):
+				regex = re.match(regex_string,value)
+			elif(get_non_term == 'bool'):
+				regex = re.match(regex_bool,value)
+						
+	if regex == None:
+		print("Err->31")
+		sys.exit(31)
+
+	return True
 
 def parse_args(formal_args, inst):
 	if(len(formal_args) != len(inst)):
@@ -36,12 +75,12 @@ def parse_args(formal_args, inst):
 			print("Err->31")
 			sys.exit(31)
 		elif (not regex_match(arg.attrib['type'],arg.text,form_arg)):	
-			print('Err->31asdad')
+			print('Err->31')
 			sys.exit(31)
 		counter +=1
 	return True	
 
-def parse_instruction(inst,order,inst_dict):
+def parse_inst(inst,order,inst_dict):
 	if(('order' not in inst.attrib) or ('opcode' not in inst.attrib)):
 		print("Err->31")
 		sys.exit(31)
@@ -49,10 +88,476 @@ def parse_instruction(inst,order,inst_dict):
 		print("Err->31")
 		sys.exit(31)
 	else:
-		parse_args(inst_dict[inst.attrib['opcode']],inst)
+		return parse_args(inst_dict[inst.attrib['opcode']],inst)
+
+def get_labels(inst,order,labels):
+
+	if(inst.attrib['opcode'] == 'LABEL'):
+		if(inst[0].text in labels):
+			print("Err->52")
+			sys.exit(52)
+		else:
+			labels.update({inst[0].text:int(inst.attrib['order'])})
+	return True
+
+def check_var(name,frame,global_f,local_f,tmp_f):
+	if not((frame == 'GF') and name in global_f):
+		print("Err->54")
+		sys.exit(54)			
+	if (frame == 'LF'):
+		if local_f == None:
+			print("Err->55")
+			sys.exit(55)
+		elif not name in local_f:
+			print("Err->54")
+			sys.exit(54)
+	if (frame == 'TF'):
+		if tmp_f == None:
+			print("Err->55")
+			sys.exit(55)
+		elif not name in tmp_f:
+			print("Err->54")
+			sys.exit(54)
+			
+def set_var(value,name,frame,global_f,local_f,tmp_f):
+	if(frame == "GF"):
+		global_f[name] = value
+	elif(frame == "LF"):
+		local_f[name] = value
+	elif(frame == "TF"):
+		tmp_f[name] = value
+
+def get_var(name,frame,global_f,local_f,tmp_f):
+	if(frame == "GF"):
+		return global_f[name]
+	elif(frame == "LF"):
+		return local_f[name]
+	elif(frame == "TF"):
+		return tmp_f[name]
+
+def move(dest,value,typ,global_f,local_f,tmp_f):
+
+	check_var(dest[3:],dest[0:2],global_f,local_f,tmp_f)
+	if(value == None) and (typ == "string"):
+		value = ""	
+	if(typ == "var"):
+		check_var(value[3:],value[0:2],global_f,local_f,tmp_f)
+		value = get_var(value[3:],value[0:2],global_f,local_f,tmp_f)
+	set_var(value,dest[3:],dest[0:2],global_f,local_f,tmp_f)
+
+#TODO - zjistit jestli redefinice je problem
+def defvar(variable,global_f,local_f,tmp_f):
+	where = variable[0:2]
+	name = variable[3:]
+	if(where == 'GF'):
+		global_f[name] = None
+	elif(where == 'LF'):
+		if(local_f != None):
+			local_f[name] = None
+		else:
+			print("Err->55")
+			sys.exit(55)	
+	elif(where == 'TF'):
+		if(tmp_f != None):
+			tmp_f[name] = None
+		else:
+			print("Err->55")
+			sys.exit(55)
+	else:
+		print("Err->32")
+		sys.exit(32)
+
+def bool_lower(value):
+	if(value == False):
+		return 'false'
+	else:
+		return 'true'	
+
+def str_to_bool(value):
+	if(value == 'true'):
+		return True
+	else:
+		return False
+
+def get_value(oper,global_f,local_f,tmp_f):
+	
+	if(oper.attrib['type'] == 'var'):
+		check_var(oper.text[3:],oper.text[0:2],global_f,local_f,tmp_f)
+		return get_var(oper.text[3:],oper.text[0:2],global_f,local_f,tmp_f)		
+	elif(oper.attrib['type'] == 'int'):
+		return int(oper.text)
+	elif(oper.attrib['type'] == 'bool'):
+		return str_to_bool(oper.text)
+	else:
+		return oper.text	
+
+def aritmetic_instr(inst,global_f,local_f,tmp_f):
+	check_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+
+	var1 = get_value(inst[1],global_f,local_f,tmp_f)
+	if(type(var1) != int):
+		print("Err->53")
+		sys.exit(53)		
+
+	var2 = get_value(inst[2],global_f,local_f,tmp_f)
+	if(type(var2) != int):
+		print("Err->53")
+		sys.exit(53)		
+
+	if(inst.attrib['opcode'] == 'ADD'):
+		result = var1 + var2
+	elif(inst.attrib['opcode'] == 'SUB'):
+		result = var1 - var2
+	elif(inst.attrib['opcode'] == 'MUL'):
+		result = var1 * var2
+	elif(inst.attrib['opcode'] == 'IDIV'):
+		if(var2 == 0):
+			print("Err->57")
+			sys.exit(57)
+		else:
+			result = var1 // var2
+
+	set_var(result,inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)						
+
+
+def logic_instr(inst,global_f,local_f,tmp_f):
+	check_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+	
+	var1 = get_value(inst[1],global_f,local_f,tmp_f)
+	
+	if(inst.attrib['opcode'] != 'NOT'):
+		var2 = get_value(inst[2],global_f,local_f,tmp_f)
+	
+	if(inst.attrib['opcode'] in ['LT','GT','EQ']):
+		if(type(var1) == type(var2)):
+			if(inst.attrib['opcode'] == 'LT'):
+				result = var1 < var2
+			elif(inst.attrib['opcode'] == 'GT'):
+				result = var1 > var2
+			else:
+				result = var1 == var2
+		else:
+			print("Err->53")
+			sys.exit(53)	
+	if(inst.attrib['opcode'] == ['AND','OR']):
+		if(type(var1) == type(var2) == bool):
+			if(inst.attrib['opcode'] == 'AND'):
+				result = var1 and var2
+			else:
+				result = var1 or var2
+		else:
+			print("Err->53")
+			sys.exit(53)	
+	else:
+		if(type(var1) == bool):
+			result = not var1
+		else:
+			print("Err->53")
+			sys.exit(53)	
+
+	set_var(result,inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+		
+def int2char(inst,global_f,local_f,tmp_f):
+	check_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+
+	var1 = get_value(inst[1],global_f,local_f,tmp_f)
+	if(type(var1) != int):
+		print("Err->53")
+		sys.exit(53)
+
+	try:
+		set_var(chr(va1),inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+	except ValueError:
+		print("Err->58")
+		sys.exit(58)	
+
+def char2int(inst,global_f,local_f,tmp_f):
+	check_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+
+	var1 = get_value(inst[1],global_f,local_f,tmp_f)
+	if(type(var1) != str):
+		print("Err->53")
+		sys.exit(53)
+	
+	var2 = get_value(inst[2],global_f,local_f,tmp_f)
+	if(type(var2) != int):
+		print("Err->53")
+		sys.exit(53)
+
+	if(len(var1) <= var2):
+		print("Err->58")
+		sys.exit(58)	
+	else:
+		set_var(ord(var1[var2]),inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+
+def concat(inst,global_f,local_f,tmp_f):
+	check_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+
+	var1 = get_value(inst[1],global_f,local_f,tmp_f)
+	if(type(var1) != str):
+		print("Err->53")
+		sys.exit(53)
+	
+	var2 = get_value(inst[2],global_f,local_f,tmp_f)
+	if(type(var2) != str):
+		print("Err->53")
+		sys.exit(53)
+
+	set_var(var1+var2,inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+
+def strlen(inst,global_f,local_f,tmp_f):
+	check_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+
+	var1 = get_value(inst[1],global_f,local_f,tmp_f)
+	if(type(var1) != str):
+		print("Err->53")
+		sys.exit(53)
+
+	set_var(len(var1),inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+
+def getchar(inst,global_f,local_f,tmp_f):
+	check_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+
+	var1 = get_value(inst[1],global_f,local_f,tmp_f)
+	if(type(var1) != str):
+		print("Err->53")
+		sys.exit(53)
+	
+	var2 = get_value(inst[2],global_f,local_f,tmp_f)
+	if(type(var1) != int):
+		print("Err->53")
+		sys.exit(53)
+
+	if(len(var1) <= var2):
+		print("Err->58")
+		sys.exit(58)	
+
+	set_var(var1[var2],inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+
+
+def setchar(inst,global_f,local_f,tmp_f):
+	check_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+	dest = get_value(inst[0],global_f,local_f,tmp_f)
+	if(type(dest) != str):
+		print("Err->53")
+		sys.exit(53)
+
+	var1 = get_value(inst[1],global_f,local_f,tmp_f)
+	if(type(var1) != int):
+		print("Err->53")
+		sys.exit(53)
+	
+	var2 = get_value(inst[2],global_f,local_f,tmp_f)
+	if(type(var2) != str):
+		print("Err->53")
+		sys.exit(53)
+
+	if(len(dest) <= var1) or (len(var2) == 0):
+		print("Err->58")
+		sys.exit(58)	
+
+	dest[var1] = var2[0]
+	set_var(dest,inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+
+def get_typ(inst,global_f,local_f,tmp_f):
+	check_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+	var1 = get_value(inst[1],global_f,local_f,tmp_f)
+	if(type(var1) == int):
+		result = "int"
+	elif(type(var1) == bool):
+		result = "bool"
+	else:
+		result = "string"
+	set_var(result,inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+
+def jump_instr(inst,global_f,local_f,tmp_f,labels):
+
+	if(inst[0].text not in labels):
+		print("Err->52")
+		sys.exit(52)
+
+	if(inst.attrib['opcode'] == 'JUMP'):
+		return [True, labels[inst[0].text]]
+	else:
+		var1 = get_value(inst[1],global_f,local_f,tmp_f)		
+		var2 = get_value(inst[2],global_f,local_f,tmp_f)
+		
+		if(type(var1) == type(var2)):
+			if(inst.attrib['opcode'] == 'JUMPIFEQ') and (var1 == var2):
+				return [True,labels[inst[0].text]]
+			elif(inst.attrib['opcode'] == 'JUMPIFNEQ') and (var1 != var2):
+				return [True,labels[inst[0].text]]
+		else:
+			print("Err->53")
+			sys.exit(53)	
+			
+	return [False,0]
+
+def read(inst,global_f,local_f,tmp_f):
+	check_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+	
+	try:
+		result = input()
+	except:
+		if(inst[1].text == 'int'):
+			result = 0
+		elif(inst[1].text == 'bool'):
+			result = False
+		else:
+			result = ""	
+
+	if(inst[1].text == 'int'):
+		result = int(result)
+	elif(inst[1].text == 'bool'):
+		result = str_to_bool(result)
+
+	set_var(result,inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+
+def write(inst,global_f,local_f,tmp_f):
+	var1 = get_value(inst[0],global_f,local_f,tmp_f)
+	if(type(var1) == bool):
+		var1 = bool_lower(var1)
+	if(inst.attrib['opcode'] == 'WRITE'):
+		print(var1)
+	else:
+		print(var1,file=sys.stderr)		
+
+def do_inst(inst,global_f,local_f,tmp_f,labels,call_stack,inst_pointer,local_frames,value_stack,counter):
+	print("DO => "+inst.attrib['opcode'])
+
+	#		FRAMES AND CALLS FUNCTION 
+	if(inst.attrib['opcode'] == 'CREATEFRAME'):
+		tmp_f = {}
+	elif(inst.attrib['opcode'] == 'PUSHFRAME'):
+		if(tmp_f != None):
+			local_frames.append(tmp_f)
+			local_f = local_frames[len(local_frames)-1]
+			tmp_f = None
+		else:
+			print("Err->55")
+			sys.exit(55)	
+	elif(inst.attrib['opcode'] == 'POPFRAME'):
+		if(local_f != None):
+			tmp_f = local_frames.pop()
+			if(local_frames == []):
+				local_f = None
+			else:
+				local_f = local_frames[len(local_frames)-1]	
+		else:
+			print("Err->55")
+			sys.exit(55)	
+	elif(inst.attrib['opcode'] == 'DEFVAR'):
+		defvar(inst[0].text,global_f,local_f,tmp_f)
+	elif(inst.attrib['opcode'] == 'MOVE'):
+		move(inst[0].text,inst[1].text,inst[1].attrib['type'],global_f,local_f,tmp_f)
+
+	elif(inst.attrib['opcode'] == 'CALL'):
+			call_stack.append(inst_pointer+1)
+			return [True,labels[inst[0].text]]
+	elif(inst.attrib['opcode'] == 'RETURN'):
+			if(call_stack == []):
+				print("Err->56")
+				sys.exit(56)
+			else:
+				return [True,call_stack.pop()]
+	
+	#  DATA STACK
+	elif(inst.attrib['opcode'] == 'PUSHS'):
+		if(inst[0].attrib['type'] == "var"):
+			check_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+			value_stack.append(get_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f))
+		else:
+			value_stack.append(inst[0].text)
+	elif(inst.attrib['opcode'] == 'POPS'):
+		if(value_stack != []):
+			check_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+			set_var(value_stack.pop(),inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+		else:
+			print("Err->56")
+			sys.exit(56)
+	#	ARITMETIC INTRUCTION
+	elif(inst.attrib['opcode'] in ['ADD','SUB','MUL','IDIV']):
+		aritmetic_instr(inst,global_f,local_f,tmp_f)
+	
+	#	LOGIC INTRUCTION
+	elif(inst.attrib['opcode'] in ['LT','GT','EQ','AND','OR','NOT']):
+		logic_instr(inst,global_f,local_f,tmp_f)		
+
+	# STRING
+	elif(inst.attrib['opcode'] == 'INT2CHAR'):
+		int2char(inst,global_f,local_f,tmp_f)
+
+	elif(inst.attrib['opcode'] == 'STRI2INT'):
+		char2int(inst,global_f,local_f,tmp_f)
+
+	elif(inst.attrib['opcode'] == 'CONCAT'):
+		concat(inst,global_f,local_f,tmp_f)
+
+	elif(inst.attrib['opcode'] == 'STRLEN'):
+		strlen(inst,global_f,local_f,tmp_f)	
+
+	elif(inst.attrib['opcode'] == 'GETCHAR'):
+		getchar(inst,global_f,local_f,tmp_f)
+		
+	elif(inst.attrib['opcode'] == 'SETCHAR'):
+		setchar(inst,global_f,local_f,tmp_f)
+	# I/O INSTRUCTION + DEBAG DPRINT
+	elif(inst.attrib['opcode'] == 'READ'):
+		read(inst,global_f,local_f,tmp_f)
+
+	elif(inst.attrib['opcode'] in ['WRITE','DPRINT']):
+		write(inst,global_f,local_f,tmp_f)
+	
+	# TYPE
+	elif(inst.attrib['opcode'] == 'TYPE'):
+		get_typ(inst,global_f,local_f,tmp_f)
+	
+	# CONTROL INSTRUCTION
+	elif(inst.attrib['opcode'] in ['JUMP','JUMPIFNEQ','JUMPIFEQ']):
+		return jump_instr(inst,global_f,local_f,tmp_f,labels)
+	
+	# DEBUG INSTRUCTION
+	elif(inst.attrib['opcode'] == 'BREAK'):
+		print("Pozition=>"+inst_pointer,file=sys.stderr)
+		print("Global frame=>"+global_f,file=sys.stderr)		
+		print("Local frame=>"+local_f,file=sys.stderr)		
+		print("Temporery frame=>"+tmp_f,file=sys.stderr)		
+		print("Exexuted instruction=>"+counter,file=sys.stderr)	
+	return [False,0]
+
+def interpretation(code,labels,max_ip):
+	
+	local_frames = []
+	local_f = None
+	global_f = {}
+	tmp_f = None
+	call_stack = []
+	value_stack = []
+
+	inst_pointer = 0
+	counter = 0
+	label = [False,0]
+	
+	while(inst_pointer < max_ip):
+		counter += 1
+		label = do_inst(code[inst_pointer],global_f,local_f,tmp_f,labels,call_stack,inst_pointer,local_frames,value_stack,counter)
+	
+		if(label[0]):
+			inst_pointer = label[1]
+			label = [False,0]
+		else:
+			inst_pointer +=1
+		
+
+	print("#####FRAMES#####")
+	print(local_f)
+	print(global_f)
+	print(tmp_f)
+
+	return True
 
 def parse_xml(file):
-	instruction_dict = {'MOVE':['var','symb'],'CREATEFRAME':[],'PUSHFRAME':[],'POPFRAME':[],'DEFVAR':['var'],'CALL':['label'],
+	inst_dict = {'MOVE':['var','symb'],'CREATEFRAME':[],'PUSHFRAME':[],'POPFRAME':[],'DEFVAR':['var'],'CALL':['label'],
 	'RETURN':[],'PUSHS':['symb'],'POPS':['var'],'ADD':['var','symb','symb'],'SUB':['var','symb','symb'],'MUL':['var','symb','symb'],
 	'IDIV':['var','symb','symb'],'LT':['var','symb','symb'],'GT':['var','symb','symb'],'EQ':['var','symb','symb'],
 	'AND':['var','symb','symb'],'OR':['var','symb','symb'],'NOT':['var','symb'],'INT2CHAR':['var','symb'],'STRI2INT':['var','symb','symb'],
@@ -66,13 +571,17 @@ def parse_xml(file):
 	#<program language="IPPcode18">
 	if(program.tag != "program") or ('language' not in program.attrib) or(program.attrib['language']  !=  "IPPcode18"):
 		print("Err->31")
-		return 31
+		sys.exit(31)
 	
 	order = 1
-	for instruction in program: 
-		parse_instruction(instruction,order,instruction_dict)
+	labels = {}
+	for inst in program: 
+		parse_inst(inst,order,inst_dict)
+		get_labels(inst,order,labels)
 		order += 1
-		
+	
+	interpretation(program,labels,order-1)
+
 	return 0
 
 
