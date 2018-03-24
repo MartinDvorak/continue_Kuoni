@@ -101,9 +101,10 @@ def get_labels(inst,order,labels):
 	return True
 
 def check_var(name,frame,global_f,local_f,tmp_f):
-	if not((frame == 'GF') and name in global_f):
-		print("Err->54")
-		sys.exit(54)			
+	if (frame == 'GF'):
+		if not name in global_f:
+			print("Err->54")
+			sys.exit(54)			
 	if (frame == 'LF'):
 		if local_f == None:
 			print("Err->55")
@@ -143,6 +144,13 @@ def move(dest,value,typ,global_f,local_f,tmp_f):
 	if(typ == "var"):
 		check_var(value[3:],value[0:2],global_f,local_f,tmp_f)
 		value = get_var(value[3:],value[0:2],global_f,local_f,tmp_f)
+	elif(typ == "int"):
+		value = int(value)
+	elif(typ == "bool"):
+		value = str_to_bool(value)
+	else:
+		value = remove_backslash(value)	
+		
 	set_var(value,dest[3:],dest[0:2],global_f,local_f,tmp_f)
 
 #TODO - zjistit jestli redefinice je problem
@@ -179,6 +187,21 @@ def str_to_bool(value):
 	else:
 		return False
 
+def remove_backslash(text):
+	result = ""
+	if text == None:
+		return result
+	i = 0
+	while i < len(text):
+		if(text[i] == '\\'):
+			num = text[i+1]+text[i+2]+text[i+3]
+			result += chr(int(num))
+			i +=4
+		else:
+			result += text[i]
+			i+=1
+	return result
+
 def get_value(oper,global_f,local_f,tmp_f):
 	
 	if(oper.attrib['type'] == 'var'):
@@ -189,7 +212,7 @@ def get_value(oper,global_f,local_f,tmp_f):
 	elif(oper.attrib['type'] == 'bool'):
 		return str_to_bool(oper.text)
 	else:
-		return oper.text	
+		return remove_backslash(oper.text)	
 
 def aritmetic_instr(inst,global_f,local_f,tmp_f):
 	check_var(inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
@@ -239,7 +262,8 @@ def logic_instr(inst,global_f,local_f,tmp_f):
 		else:
 			print("Err->53")
 			sys.exit(53)	
-	if(inst.attrib['opcode'] == ['AND','OR']):
+	elif(inst.attrib['opcode'] in ['AND','OR']):
+		
 		if(type(var1) == type(var2) == bool):
 			if(inst.attrib['opcode'] == 'AND'):
 				result = var1 and var2
@@ -266,7 +290,7 @@ def int2char(inst,global_f,local_f,tmp_f):
 		sys.exit(53)
 
 	try:
-		set_var(chr(va1),inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
+		set_var(chr(var1),inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
 	except ValueError:
 		print("Err->58")
 		sys.exit(58)	
@@ -324,7 +348,7 @@ def getchar(inst,global_f,local_f,tmp_f):
 		sys.exit(53)
 	
 	var2 = get_value(inst[2],global_f,local_f,tmp_f)
-	if(type(var1) != int):
+	if(type(var2) != int):
 		print("Err->53")
 		sys.exit(53)
 
@@ -356,7 +380,7 @@ def setchar(inst,global_f,local_f,tmp_f):
 		print("Err->58")
 		sys.exit(58)	
 
-	dest[var1] = var2[0]
+	dest = dest[:var1] + var2[0] + dest[var1+1:]
 	set_var(dest,inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
 
 def get_typ(inst,global_f,local_f,tmp_f):
@@ -410,7 +434,8 @@ def read(inst,global_f,local_f,tmp_f):
 		result = int(result)
 	elif(inst[1].text == 'bool'):
 		result = str_to_bool(result)
-
+	else:
+		reuslt = remove_backslash(result)
 	set_var(result,inst[0].text[3:],inst[0].text[0:2],global_f,local_f,tmp_f)
 
 def write(inst,global_f,local_f,tmp_f):
@@ -423,8 +448,7 @@ def write(inst,global_f,local_f,tmp_f):
 		print(var1,file=sys.stderr)		
 
 def do_inst(inst,global_f,local_f,tmp_f,labels,call_stack,inst_pointer,local_frames,value_stack,counter):
-	print("DO => "+inst.attrib['opcode'])
-
+	#print("DO => "+inst.attrib['opcode'])
 	#		FRAMES AND CALLS FUNCTION 
 	if(inst.attrib['opcode'] == 'CREATEFRAME'):
 		tmp_f = {}
@@ -436,6 +460,7 @@ def do_inst(inst,global_f,local_f,tmp_f,labels,call_stack,inst_pointer,local_fra
 		else:
 			print("Err->55")
 			sys.exit(55)	
+
 	elif(inst.attrib['opcode'] == 'POPFRAME'):
 		if(local_f != None):
 			tmp_f = local_frames.pop()
@@ -446,6 +471,7 @@ def do_inst(inst,global_f,local_f,tmp_f,labels,call_stack,inst_pointer,local_fra
 		else:
 			print("Err->55")
 			sys.exit(55)	
+
 	elif(inst.attrib['opcode'] == 'DEFVAR'):
 		defvar(inst[0].text,global_f,local_f,tmp_f)
 	elif(inst.attrib['opcode'] == 'MOVE'):
@@ -453,13 +479,13 @@ def do_inst(inst,global_f,local_f,tmp_f,labels,call_stack,inst_pointer,local_fra
 
 	elif(inst.attrib['opcode'] == 'CALL'):
 			call_stack.append(inst_pointer+1)
-			return [True,labels[inst[0].text]]
+			return [True,labels[inst[0].text]],local_f,tmp_f
 	elif(inst.attrib['opcode'] == 'RETURN'):
 			if(call_stack == []):
 				print("Err->56")
 				sys.exit(56)
 			else:
-				return [True,call_stack.pop()]
+				return [True,call_stack.pop()],local_f,tmp_f
 	
 	#  DATA STACK
 	elif(inst.attrib['opcode'] == 'PUSHS'):
@@ -514,7 +540,7 @@ def do_inst(inst,global_f,local_f,tmp_f,labels,call_stack,inst_pointer,local_fra
 	
 	# CONTROL INSTRUCTION
 	elif(inst.attrib['opcode'] in ['JUMP','JUMPIFNEQ','JUMPIFEQ']):
-		return jump_instr(inst,global_f,local_f,tmp_f,labels)
+		return jump_instr(inst,global_f,local_f,tmp_f,labels),local_f,tmp_f
 	
 	# DEBUG INSTRUCTION
 	elif(inst.attrib['opcode'] == 'BREAK'):
@@ -523,7 +549,15 @@ def do_inst(inst,global_f,local_f,tmp_f,labels,call_stack,inst_pointer,local_fra
 		print("Local frame=>"+local_f,file=sys.stderr)		
 		print("Temporery frame=>"+tmp_f,file=sys.stderr)		
 		print("Exexuted instruction=>"+counter,file=sys.stderr)	
-	return [False,0]
+	return [False,0],local_f,tmp_f
+
+def max_alloc(global_f,local_f,tmp_f):
+	result = 0
+	if(local_f != None):
+		result = len(local_f)
+	if(tmp_f != None):
+		result += len(tmp_f)
+	return result + len(global_f)
 
 def interpretation(code,labels,max_ip):
 	
@@ -537,24 +571,28 @@ def interpretation(code,labels,max_ip):
 	inst_pointer = 0
 	counter = 0
 	label = [False,0]
-	
+	max_vars = 0
+
 	while(inst_pointer < max_ip):
 		counter += 1
-		label = do_inst(code[inst_pointer],global_f,local_f,tmp_f,labels,call_stack,inst_pointer,local_frames,value_stack,counter)
+		label,local_f,tmp_f = do_inst(code[inst_pointer],global_f,local_f,tmp_f,labels,call_stack,inst_pointer,local_frames,value_stack,counter)
 	
 		if(label[0]):
 			inst_pointer = label[1]
 			label = [False,0]
 		else:
 			inst_pointer +=1
-		
 
-	print("#####FRAMES#####")
-	print(local_f)
-	print(global_f)
-	print(tmp_f)
+		max_vars = max(max_vars,max_alloc(global_f,local_f,tmp_f))
 
-	return True
+	print("\n\n#####FRAMES#####")
+	print("local=>	"+str(local_f))
+	print("global=>	"+str(global_f))
+	print("tmp=>	"+str(tmp_f))
+	print("stack_of_frames=>"+str(local_frames))
+	print("\n\n")
+
+	return counter,max_vars
 
 def parse_xml(file):
 	inst_dict = {'MOVE':['var','symb'],'CREATEFRAME':[],'PUSHFRAME':[],'POPFRAME':[],'DEFVAR':['var'],'CALL':['label'],
@@ -580,10 +618,7 @@ def parse_xml(file):
 		get_labels(inst,order,labels)
 		order += 1
 	
-	interpretation(program,labels,order-1)
-
-	return 0
-
+	return interpretation(program,labels,order-1)
 
 if __name__ == '__main__':
 
@@ -629,7 +664,30 @@ vars - priogram bude pocitat promene""")
 		print("Err->10")
 		sys.exit(10)
 		
-	rv = parse_xml(file)	
-	print(rv)
-	print("OK")
-	sys.exit(rv)
+	num_inst,max_vars = parse_xml(file)	
+
+	if(stats == True):
+		try:
+			out = open(stats_file,'w')
+		except IOError:
+			print("Err->12")
+			sys.exit(12)
+		else:
+			if(stats_inst > 0) and (stats_var > 0):
+				if(stats_inst > stats_var):
+					out.write(max_vars)
+					out.write(num_inst)
+				else:
+					out.write(num_inst)
+					out.write(max_vars)
+			elif(stats_inst > 0):
+				out.write(num_inst)
+			elif(stats_var > 0):
+				out.write(max_vars)
+		finally:
+			out.close()				
+
+#	print("instruction=>"+str(num_inst))
+#	print("vars=>"+str(max_vars))
+#	print("OK")
+	sys.exit(0)
